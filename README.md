@@ -8,7 +8,7 @@
 + pubmed
 
 | Dataset | Nodes | Edges | Features | Classes | 
-| :---: | :---:| :---: | :---: | :---:| :---: | 
+| :---: | :---:| :---: | :---: | :---:|
 | Citeseer | 3,327 | 4,732 | 3,703 | 6 | 
 | Cora | 2,708 | 5,429 | 1,433 | 7 | 
 | Chameleon	| 2,277 | 36,101 | 2,325 | 4 |
@@ -31,7 +31,7 @@ python node_classification_task.py --neighbor_epoch 5 --step 0 --N 1 --l "20" --
 
 + Accuracy (Nomal Model)
     | Dataset | Deep Walk | Node2vec | GCN | GAT | Node2BERT(our)|
-    | :------: | :------: | :------: | :------: |
+    | :------: | :------: | :------: | :------: | :------: | :------: |
     | Cora(%)	| 70.2 | 71 |	81.5 | 83 | 85.5 |
     | Citeseer(%)	| 51.3 | 47.3 | 70.3 | 72.5 |	70 |
     | Chameleon(%)	| 43.9 | 31.4 | 67.6 | 65 | 67.2 | 
