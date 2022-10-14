@@ -1,7 +1,7 @@
-#Node2BERT
-##Abstarct
-###Graph neural networks (GNN) have become the standard learning method for graphs owing to their outstanding performance. In GNNs, the performance of the model is determined by the node attributes, although there are extreme cases of incomplete and absent attributes. We propose Node2BERT, which performs representation learning only with the structure of graphs. Our model consists of a novel search bias model and a BERT model, which learns the graph structure as well as neighbor information. Node2BERT represents node relationships between 5 and 100 hops without performance degradation, furthermore it outperforms the existing models.
-##Experiments
+# Node2BERT
+## Abstarct
+### Graph neural networks (GNN) have become the standard learning method for graphs owing to their outstanding performance. In GNNs, the performance of the model is determined by the node attributes, although there are extreme cases of incomplete and absent attributes. We propose Node2BERT, which performs representation learning only with the structure of graphs. Our model consists of a novel search bias model and a BERT model, which learns the graph structure as well as neighbor information. Node2BERT represents node relationships between 5 and 100 hops without performance degradation, furthermore it outperforms the existing models.
+## Experiments
 ### Datasets
 + citeseer
 + cora
