@@ -27,7 +27,7 @@ python node_classification_task.py --neighbor_epoch 5 --step 0 --N 1 --l "20" --
 
 ### Experiment results
 + Accuracy (Attribute Missing)
-  ![](experiments/results.png)
+  ![](results.png)
 
 + Accuracy (Nomal Model)
     | Dataset | Deep Walk | Node2vec | GCN | GAT | Node2BERT(our)|
