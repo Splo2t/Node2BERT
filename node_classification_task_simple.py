@@ -25,6 +25,17 @@ import numpy as np
 from torch import nn
 metric = load_metric("accuracy")
 device = torch.device("cuda:0")
+class BERTClassifier(nn.Module):
+    def __init__(self, bert):
+        super(BERTClassifier, self).__init__()
+        self.bert = bert
+
+    def forward(self, input_ids, token_type_ids, attention_mask, position_ids = None):
+        if position_ids != None:
+            out = self.bert(input_ids = input_ids, token_type_ids = token_type_ids, attention_mask = attention_mask, position_ids = position_ids).pooler_output
+        else:
+            out = self.bert(input_ids = input_ids, token_type_ids = token_type_ids, attention_mask = attention_mask).pooler_output
+        return out
 
 class GraphDataset(Dataset):
     def __init__(
@@ -32,6 +43,12 @@ class GraphDataset(Dataset):
         dict_type_data,
     ):
         self.examples = dict_type_data
+        for i in range(len(dict_type_data)):
+            self.examples[i]["input_ids"] = torch.tensor(self.examples[i]["input_ids"], dtype=torch.long)
+            self.examples[i]["position_ids"] = torch.tensor(self.examples[i]["position_ids"], dtype=torch.long)
+            self.examples[i]["attention_mask"] = torch.tensor(self.examples[i]["attention_mask"], dtype=torch.long)
+            self.examples[i]["token_type_ids"] = torch.tensor(self.examples[i]["token_type_ids"], dtype=torch.long)
+        
     def __len__(self):
         return len(self.examples)
 
@@ -85,9 +102,9 @@ def func_2(args, G, label, epoch_num, vec, org_nodes, nodes):
                             "input_ids": input_ids,
                             "token_type_ids": token_type_ids,
                             "attention_mask": attention_mask,
-                            #"label": label[i],
-                            #"node": i,
-                            #"neighbor": False
+                            "label": label[i],
+                            "node": i,
+                            "neighbor": False
         }
         if args.position == "True":
             example["position_ids"] = position_ids
@@ -132,9 +149,9 @@ def func_2(args, G, label, epoch_num, vec, org_nodes, nodes):
                                 "input_ids": input_ids,
                                 "token_type_ids": token_type_ids,
                                 "attention_mask": attention_mask,
-                                #"label": label[i],
-                                #"node": i,
-                                #"neighbor": True
+                                "label": label[i],
+                                "node": i,
+                                "neighbor": True
             }
 
             if args.position == 'True':
@@ -221,18 +238,18 @@ def parse_args():
     parser.add_argument('--epoch', type=int, default=600, help='epoch')
     parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate')
     parser.add_argument('--batch_size', type=int, default=2048, help='batch size')
+    parser.add_argument('--steps', type=int, required=True, default='3600')
 
     parser.add_argument('--k', type=float, default=10, help='window size')
     parser.add_argument('--input', type=str, required=True, help='blog')
-
-    parser.add_argument('--neighbor_epoch', type=int, required=True, help='num on neighbor epochs')
-    parser.add_argument('--train_epoch', type=int, default=600, help='num on train epochs')
+    parser.add_argument('--neighbor_epoch', type=int, required=True, help='num on epochs')
 
     parser.add_argument('--position', type=str, required=True, help='If True -> position_ids else non position_ids')
     parser.add_argument('--bert_layer', type=int, required=True, help='num of bert_layer')
     parser.add_argument('--mlm_prob', type=float, required=True, help='masking probablity, 0.5 is best')
     parser.add_argument('--hidden_size', type=int, required=True, help='hidden_size ex:768(BERT) or 128')
     parser.add_argument('--block_size', type=int, required=True, help='block_size(hidden_size/block_size = block_size) ex:32(BERT) or 64')
+    parser.add_argument('--N', type=int, required=True, help='N')
 
     args = parser.parse_args()
     return args
@@ -268,73 +285,102 @@ if __name__ == '__main__':
         exit() 
     project_name = HOP_NAME+args.input + "_".join([str(mlm_prob), str(bert_layer), str(hidden_size),str(block_size),"PQ",str(args.l)])
     #########################################################
-
+    #Downstream task를 위한 추가 변수 정의
+    X_Train = dict()
+    Y_Train = dict()
+    X_Test = dict()
+    Y_Test = dict()
     #########################################################
     G , label = read_graph(args.input)
     nodes = graph_to_tokens(G)
 
-    #make a voca
-    createFolder(args.input) 
-    with open(args.input + os.sep + 'vocab.txt', 'w') as f:
-        f.write("[PAD]" + '\n')
-        f.write("[MASK]" + '\n')
-        for i in list(G.nodes):
-            f.write(str(i) + '\n')
-    vocab_size = len(nodes)
-    
-    datasets = []
-    temp_datasets = work_func(args,G, label, nodes,parameters, epoch_num)
-    for i in temp_datasets:
-        for j in i:
-            if i == None:
-                continue
-            datasets.append(j)
-
-    random.shuffle(datasets) 
-    #########################################################
-    config = BertConfig(   # https://huggingface.co/transformers/model_doc/bert.html#bertconfig
-        vocab_size = vocab_size,
-        hidden_size = hidden_size,
-        num_hidden_layers = bert_layer,
-        num_attention_heads = hidden_size//block_size,
-        intermediate_size = hidden_size*4,
-        max_position_embeddings = maxlen,
-    )
-
+    test_num = random.sample(range(len(special_tokens), len(nodes)),int(len(nodes)*0.4))
+    #make a vocab
     tokenizer = BertTokenizer(
         vocab_file=args.input + os.sep +'vocab.txt',
         max_len=maxlen,
         do_lower_case=False,
     )
 
+    datasets = []
+    test_datasets = []
+    temp_datasets = work_func(args,G,label, nodes,parameters, epoch_num)
+    for i in temp_datasets:
+        for j in i:
+            if i == None:
+                continue
+            if j['node'] in test_num:
+                if j['neighbor'] == True:
+                    test_datasets.append(j)
+            else:
+                datasets.append(j)
+
+    random.shuffle(datasets) 
+    random.shuffle(test_datasets) 
+    #########################################################
+
     dataset = GraphDataset(dict_type_data = datasets)
+    test_dataset = GraphDataset(dict_type_data = test_datasets)   
 
-    data_collator = DataCollatorForLanguageModeling(    # [MASK] 를 씌우는 것은 저희가 구현하지 않아도 됩니다! :-)
-        tokenizer=tokenizer, mlm=True, mlm_probability=mlm_prob
-    )
+    train_dataloader = DataLoader(dataset, batch_size=args.batch_size, num_workers=8)
+    test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, num_workers=8)
 
-    model = BertForMaskedLM(config=config)
-    model.num_parameters()
-
-    training_args = TrainingArguments(
-        output_dir=project_name, 
-        num_train_epochs=args.train_epoch,
-        per_gpu_train_batch_size=args.batch_size,
-        save_steps=600, # step 수마다 모델을 저장
-        logging_steps=50,
-        learning_rate=args.learning_rate,
-        dataloader_num_workers = 1,
-    )
-
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        data_collator=data_collator,
-        train_dataset=dataset,
-    )
-
-    trainer.train()
-    trainer.save_model(project_name)
-
+    bert_model = BertModel.from_pretrained(project_name)
+    model = BERTClassifier(bert_model).to(device)
     
+    svm_data = []
+    svm_label = []
+    test_svm_data = []
+    test_svm_label = []
+    num_epochs = 1
+    for e in range(num_epochs):
+        model.eval()
+        print("start")
+        temp_output_data = []
+        for batch_id, samples in enumerate(train_dataloader):
+            #print(se)
+            #optimizer.zero_grad()
+            ids = samples['input_ids']
+            tok_type = samples['token_type_ids']
+            label = samples['label']
+            atten = samples['attention_mask']
+            posid = samples['position_ids']
+            out = model(input_ids = ids.to(device),token_type_ids = tok_type.to(device), attention_mask = atten.to(device), position_ids = posid.to(device))
+            
+            
+            output = out.cpu().detach().numpy()
+            labels = label.detach().numpy()
+            #print(len(labels))
+            #print(len(output))
+            for i in range(len(labels)):
+                svm_data.append(output[i])
+                svm_label.append(labels[i])
+                
+    for e in range(num_epochs):
+        model.eval()
+        print("start")
+        temp_output_data = []
+        for batch_id, samples in enumerate(test_dataloader):
+            ids = samples['input_ids']
+            tok_type = samples['token_type_ids']
+            label = samples['label']
+            atten = samples['attention_mask']
+            posid = samples['position_ids']
+            out = model(input_ids = ids.to(device),token_type_ids = tok_type.to(device), attention_mask = atten.to(device), position_ids = posid.to(device))
+        
+            
+            output = out.cpu().detach().numpy()
+            labels = label.detach().numpy()
+            for i in range(len(labels)):
+                test_svm_data.append(output[i])
+                test_svm_label.append(labels[i])
+            
+    from sklearn.metrics import classification_report
+    from sklearn.svm import SVC
+    from sklearn.metrics  import f1_score, accuracy_score, precision_score, recall_score, confusion_matrix
 
+    classifier = SVC(kernel = 'rbf', random_state = 0)
+    classifier.fit(svm_data, svm_label)
+    pred = classifier.predict(test_svm_data)
+    my_f1_score = f1_score(test_svm_label, pred, average="micro")
+    print("F1 score:", my_f1_score)

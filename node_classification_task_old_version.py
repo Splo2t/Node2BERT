@@ -1,5 +1,4 @@
 import requests
-
 from torch_geometric.datasets import Planetoid, WikipediaNetwork, PPI, Actor
 from functools import partial
 from node2vec import node2vec
@@ -40,12 +39,10 @@ from torch.utils.data.dataset import Dataset
 from sklearn.metrics  import f1_score, accuracy_score, precision_score, recall_score, confusion_matrix
 import torch
 import random
-batch_size = 128
-# 1-hop 추가 or 추가X 추가 하면 몇 개 추가?
-# chameleon0.3_undir_3_64_64_PQ_True/checkpoint-4800
-#
 import random
 random.seed(42)
+batch_size = 128
+
 def func_2(G, label, test_num, vec,  org_nodes, nodes):
     return_example = []
     test_datasets = []
@@ -123,12 +120,14 @@ class TextDataset(Dataset):
 
     def __getitem__(self, i):
         return self.examples[i]
+
 def calc_accuracy(X,Y):
     X = X.to("cpu")
     Y = Y.to("cpu")
     max_vals, max_indices = torch.max(X, 1)
     train_acc = (max_indices == Y).sum().data/max_indices.size()[0]
     return train_acc
+
 class BERTClassifier(nn.Module):
     def __init__(self, bert):
         super(BERTClassifier, self).__init__()
@@ -141,7 +140,7 @@ class BERTClassifier(nn.Module):
             out = self.bert(input_ids = input_ids, token_type_ids = token_type_ids, attention_mask = attention_mask).pooler_output
         return out
 
-def read_graph(graph_type, data_name):
+def read_graph(data_name):
     global node_class
     global ndde_feature
     global class_num
@@ -169,76 +168,62 @@ def read_graph(graph_type, data_name):
     from torch_geometric.utils.convert import to_networkx
     G = to_networkx(data)
     node_labels = data.y[list(G.nodes)].numpy().tolist()
-    #print(len(node_labels))
     node_class =dict()
     for k,v  in enumerate(node_labels):
         node_class[k] = v
-    if graph_type == 'reverse':
-        G = G.reverse()
-    elif graph_type == 'undir':    
-        G = G.to_undirected()
+ 
+    G = G.to_undirected()
     for edge in G.edges():
         G[edge[0]][edge[1]]['weight'] = 1
     return G, node_class
 
-mlm_prob_list = [0.3]
-hidden_size_list= [64]
-block_size_list = [64]
-my_graph_structure_list = ["undir"]
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--p', type=float, default=3, help='return parameter')
+    parser.add_argument('--q', type=float, default=0.5, help='in-out parameter')
+    parser.add_argument('--d', type=int, default=128, help='dimension')
+    parser.add_argument('--r', type=int, default=10, help='walks per node')
+    parser.add_argument('--l', type=int, default=10, help='walk length')
+    parser.add_argument('--k', type=float, default=10, help='window size')
+    parser.add_argument('--input', type=str, default='cham', help='cora')
+    parser.add_argument('--steps', type=int, required=True, default='3600')
+    #parser.add_argument('--project_name', type=str, required=True)
+    #parser.add_argument('--hop', type=str, required=True, default='not_hop_model or hop_model')
+    parser.add_argument('--device', type=str, default="CUDA")
+    parser.add_argument('--neighbor_epoch', type=int, required=True, help='num on epochs')
+    #parser.add_argument('--l_lit', type=str, required=True, help='l_list')
+    parser.add_argument('--position', type=str, required=True, help='If True -> position_ids else non position_ids')
+    parser.add_argument('--bert_layer', type=int, required=True, help='num of bert_layer')
+    parser.add_argument('--mlm_prob', type=float, required=True, help='masking probablity, 0.5 is best')
+    parser.add_argument('--hidden_size', type=int, required=True, help='hidden_size ex:768(BERT) or 128')
+    parser.add_argument('--block_size', type=int, required=True, help='block_size(hidden_size/block_size = block_size) ex:32(BERT) or 64')
+    parser.add_argument('--N', type=int, required=True, help='N')
 
-
-parser = argparse.ArgumentParser()
-parser.add_argument('--p', type=float, default=3, help='return parameter')
-parser.add_argument('--q', type=float, default=0.5, help='in-out parameter')
-parser.add_argument('--d', type=int, default=128, help='dimension')
-parser.add_argument('--r', type=int, default=10, help='walks per node')
-parser.add_argument('--l', type=int, default=10, help='walk length')
-parser.add_argument('--k', type=float, default=10, help='window size')
-parser.add_argument('--input', type=str, default='cham', help='cora')
-parser.add_argument('--steps', type=int, required=True, default='3600')
-#parser.add_argument('--project_name', type=str, required=True)
-#parser.add_argument('--hop', type=str, required=True, default='not_hop_model or hop_model')
-parser.add_argument('--device', type=str, default="CUDA")
-parser.add_argument('--neighbor_epoch', type=int, required=True, help='num on epochs')
-#parser.add_argument('--l_lit', type=str, required=True, help='l_list')
-parser.add_argument('--position', type=str, required=True, help='If True -> position_ids else non position_ids')
-parser.add_argument('--bert_layer', type=int, required=True, help='num of bert_layer')
-parser.add_argument('--mlm_prob', type=float, required=True, help='masking probablity, 0.5 is best')
-parser.add_argument('--hidden_size', type=int, required=True, help='hidden_size ex:768(BERT) or 128')
-parser.add_argument('--block_size', type=int, required=True, help='block_size(hidden_size/block_size = block_size) ex:32(BERT) or 64')
-parser.add_argument('--N', type=int, required=True, help='N')
-
-args = parser.parse_args()
-import random
-random.seed(42)
+    args = parser.parse_args()
+    return args
 
 maxlen = args.l+1
 dfs_parameter_list = [[1000000 ,0.000001, args.l]]
-graph_structure = 'undir'
 epoch_num=args.neighbor_epoch
+mlm_prob = args.mlm_prob
+bert_layer = args.bert_layer
+hidden_size = args.hidden_size
+block_size = args.block_size
 
 if args.position == 'True':
     HOP_NAME = f'position_paper_version/'
 elif args.position == 'False':
     HOP_NAME = f'non_position_paper_version/'
-mlm_prob = args.mlm_prob
-bert_layer = args.bert_layer
-hidden_size = args.hidden_size
-block_size = args.block_size
-#l_list = args.l
-print(mlm_prob)
-print(bert_layer)
-print(hidden_size)
-print(block_size)
-print(args.l)
+
 if block_size > hidden_size:
     print("ERROR, block size must be smaller than hidden_size)")
     exit()
-parameter_list_all = [str(mlm_prob), str(graph_structure), str(bert_layer), str(hidden_size),str(block_size),"PQ",str(args.l)]
+
+parameter_list_all = [str(mlm_prob),  str(bert_layer), str(hidden_size),str(block_size),"PQ",str(args.l)]
 project_name = HOP_NAME+args.input + "_".join(parameter_list_all)
 
 # Graph generation and node token generation
-G , _= read_graph(graph_structure, args.input)
+G , _= read_graph(args.input)
 nodes =  [x for x in list(G.nodes)]
 nodes.sort()
 special_tokens = [-2,-1]
@@ -255,9 +240,10 @@ if args.device == "CUDA":
     device = torch.device("cuda:0")
 else:
     device = torch.device("cpu")
+
 N = args.N
 
-parameter_list_str = [str(mlm_prob), str(graph_structure), str(bert_layer), str(hidden_size),str(block_size),"PQ",str(args.l)]
+parameter_list_str = [str(mlm_prob), str(bert_layer), str(hidden_size),str(block_size),"PQ",str(args.l)]
 project_name = HOP_NAME+args.input + "_".join(parameter_list_str)
 #    project_name = HOP_NAME+args.input + "_".join(parameter_list_all)
 if args.steps != 0:
@@ -275,15 +261,15 @@ multi_thread_list = []
 
 parameter_list = dfs_parameter_list
 for now_index in range(N):
-    parameter_list_str = [str(mlm_prob), str(graph_structure), str(bert_layer), str(hidden_size),str(block_size),"PQ",str(args.l)]
+    parameter_list_str = [str(mlm_prob), str(bert_layer), str(hidden_size),str(block_size),"PQ",str(args.l)]
     project_name = HOP_NAME+args.input + "_".join(parameter_list_str)
-    parameter_list_all = [mlm_prob, graph_structure, bert_layer, hidden_size, block_size, parameter_list,args.steps]
+    parameter_list_all = [mlm_prob, bert_layer, hidden_size, block_size, parameter_list,args.steps]
     if args.steps != 0:
         project_name +='/checkpoint-'+str(args.steps)#hop+"/"+args.input + "_".join(parameter_list_all)
 
     #project_name +='/checkpoint-'+str(args.steps)#hop+"/"+args.input + "_".join(parameter_list_all)
 
-    G , label = read_graph(graph_structure, args.input)
+    G , label = read_graph(args.input)
 
     nodes =  [x for x in list(G.nodes)]
     nodes.sort()
@@ -323,8 +309,6 @@ for now_index in range(N):
             datasets.append(k)
                                 
         
-                
-                
                 
     print(len(test_datasets))
     print(len(test_num))
@@ -517,36 +501,6 @@ for item in temp_datasets:
             result_dict[project_name][idx+15] = my_acc_score
 
 
-"""
-for temps in temp_datasets:
-    project_name = temps[-2]
-    for idx in range(3):
-        result_dict[project_name][idx] += project_name[idx]
-        result_dict[project_name][idx+3] += project_name[idx+3]
-        if my_f1_score > result_dict[project_name][idx+6]:
-            result_dict[project_name][idx+6] = my_f1_score
-        if my_acc_score > result_dict[project_name][idx+9]:
-            result_dict[project_name][idx+9] = my_acc_score
-        if my_f1_score < result_dict[project_name][idx+12]:
-            result_dict[project_name][idx+12] = my_f1_score
-        if my_acc_score < result_dict[project_name][idx+15]:
-            result_dict[project_name][idx+15] = my_acc_score
-"""
-
-
-
-"""
-for p_q in p_q_list:
-    for graph_structure in my_graph_structure_list:
-        for bert_layer in bert_layer_list:
-            for block_size in block_size_list:
-                for mlm_prob in mlm_prob_list:
-                    for hidden_size in hidden_size_list:
-                        if block_size > hidden_size:
-                            continue
-                        for now_index in range(N):
-                            
-"""
 print(temp_datasets)
 print("########################################################")
 print(result_dict)
