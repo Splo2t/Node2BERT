@@ -26,6 +26,9 @@ from torch import nn
 metric = load_metric("accuracy")
 device = torch.device("cuda:0")
 
+
+
+
 class GraphDataset(Dataset):
     def __init__(
         self,
@@ -227,7 +230,7 @@ def parse_args():
 
     parser.add_argument('--neighbor_epoch', type=int, required=True, help='num on neighbor epochs')
     parser.add_argument('--train_epoch', type=int, default=600, help='num on train epochs')
-
+    parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--position', type=str, required=True, help='If True -> position_ids else non position_ids')
     parser.add_argument('--bert_layer', type=int, required=True, help='num of bert_layer')
     parser.add_argument('--mlm_prob', type=float, required=True, help='masking probablity, 0.5 is best')
@@ -249,6 +252,15 @@ if __name__ == '__main__':
     #Hyper Parameters
     #######################################################
     args = parse_args()
+    random_seed = args.seed
+    torch.manual_seed(random_seed)
+    torch.cuda.manual_seed(random_seed)
+    torch.cuda.manual_seed_all(random_seed) # if use multi-GPU
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(random_seed)
+    random.seed(random_seed)
+
     maxlen = args.l+1
     parameters = [1000000 ,0.000001, args.l]
     epoch_num=args.neighbor_epoch
@@ -266,7 +278,7 @@ if __name__ == '__main__':
     if block_size > hidden_size:
         print("ERROR, block size must be smaller than hidden_size)")
         exit() 
-    project_name = HOP_NAME+args.input + "_".join([str(mlm_prob), str(bert_layer), str(hidden_size),str(block_size),"PQ",str(args.l)])
+    project_name = str(args.seed) + "#" + HOP_NAME+args.input + "_".join([str(mlm_prob), str(bert_layer), str(hidden_size),str(block_size),"PQ",str(args.l)])
     #########################################################
 
     #########################################################

@@ -249,8 +249,8 @@ def parse_args():
     parser.add_argument('--mlm_prob', type=float, required=True, help='masking probablity, 0.5 is best')
     parser.add_argument('--hidden_size', type=int, required=True, help='hidden_size ex:768(BERT) or 128')
     parser.add_argument('--block_size', type=int, required=True, help='block_size(hidden_size/block_size = block_size) ex:32(BERT) or 64')
-    parser.add_argument('--N', type=int, required=True, help='N')
-
+    parser.add_argument('--seed', type=int, default=42)
+    
     args = parser.parse_args()
     return args
 
@@ -283,7 +283,7 @@ if __name__ == '__main__':
     if block_size > hidden_size:
         print("ERROR, block size must be smaller than hidden_size)")
         exit() 
-    project_name = HOP_NAME+args.input + "_".join([str(mlm_prob), str(bert_layer), str(hidden_size),str(block_size),"PQ",str(args.l)])
+    project_name = str(args.seed) + "#"+ HOP_NAME+args.input + "_".join([str(mlm_prob), str(bert_layer), str(hidden_size),str(block_size),"PQ",str(args.l)])
     #########################################################
     #Downstream task를 위한 추가 변수 정의
     X_Train = dict()
@@ -379,7 +379,7 @@ if __name__ == '__main__':
     from sklearn.svm import SVC
     from sklearn.metrics  import f1_score, accuracy_score, precision_score, recall_score, confusion_matrix
 
-    classifier = SVC(kernel = 'rbf', random_state = 0)
+    classifier = SVC(kernel = 'rbf', random_state = args.seed)
     classifier.fit(svm_data, svm_label)
     pred = classifier.predict(test_svm_data)
     my_f1_score = f1_score(test_svm_label, pred, average="micro")
