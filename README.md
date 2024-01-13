@@ -49,6 +49,7 @@ pip install -r requirements.txt
     
 
 ## Refrence
+```
 Rozemberczki, B., Allen, C., & Sarkar, R. (2021). Multi-scale attributed node embedding. Journal of Complex Networks, 9(2), cnab014.
 Tang, J., Qu, M., Wang, M., Zhang, M., Yan, J., & Mei, Q. (2015). Line: Large-scale information network embedding. Proceedings of the 24th International Conference on World Wide Web, 1067–1077.
 Grover, A., & Leskovec, J. (2016). node2vec: Scalable feature learning for networks. Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining, 855–864.
@@ -58,3 +59,4 @@ Cao, S., Lu, W., & Xu, Q. (2015). Grarep: Learning graph representations with gl
 Chen, H., Perozzi, B., Hu, Y., & Skiena, S. (2018). Harp: Hierarchical representation learning for networks. Proceedings of the AAAI Conference on Artificial Intelligence, 32(1).
 Chen, X., Chen, S., Yao, J., Zheng, H., Zhang, Y., & Tsang, I. W. (2020). Learning on attribute-missing graphs. IEEE Transactions on Pattern Analysis and Machine Intelligence, 44(2), 740–757.
 https://github.com/ki-ljl/node2vec
+```
