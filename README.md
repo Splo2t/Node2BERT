@@ -48,7 +48,7 @@ pip install -r requirements.txt
 
     
 
-## Refrence
+## Reference
 ```
 Rozemberczki, B., Allen, C., & Sarkar, R. (2021). Multi-scale attributed node embedding. Journal of Complex Networks, 9(2), cnab014.
 Tang, J., Qu, M., Wang, M., Zhang, M., Yan, J., & Mei, Q. (2015). Line: Large-scale information network embedding. Proceedings of the 24th International Conference on World Wide Web, 1067–1077.
